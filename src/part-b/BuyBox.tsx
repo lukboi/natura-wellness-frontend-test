@@ -1,6 +1,211 @@
-// Part B: rebuild public/reference/buy-box.png here.
-// Fonts (Fraunces, Inter) are already loaded in index.html. The product photo is /product.jpg.
+import { useId, useState } from "react";
+import { copy } from "./copy";
+import "./buybox.css";
+
+// Part B: rebuild of public/reference/buy-box.png. Everything shown follows the customer's choices:
+// purchase option, delivery frequency and quantity.
+
+type Plan = "subscribe" | "once";
+
+const MIN_QTY = 1;
+const MAX_QTY = 10;
+
+const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 export function BuyBox() {
-  return <p>Start here.</p>;
+  const [plan, setPlan] = useState<Plan>("subscribe");
+  const [frequency, setFrequency] = useState(copy.subscribe.frequencyOptions[0]);
+  const [qty, setQty] = useState(1);
+  const groupName = useId();
+  const freqId = useId();
+
+  const unitCents = plan === "subscribe" ? copy.subscribe.priceCents : copy.oneTime.priceCents;
+  const totalCents = unitCents * qty;
+
+  // copy.finePrint is written for the default (30 days, $25.46). Swap in the customer's choices so it
+  // always matches what they'll actually be charged.
+  const finePrint = copy.finePrint
+    .replace(copy.subscribe.frequencyOptions[0], frequency)
+    .replace(money(copy.subscribe.priceCents), money(totalCents));
+
+  return (
+    <div className="bb-page">
+      <div className="bb-ref" aria-hidden="true" />
+      <div className="bb">
+        <div className="bb-media">
+          <img src="/product.jpg" alt="Natura Wellness Vitamin D, 60 softgels" width={1024} height={1024} />
+        </div>
+
+        <div className="bb-info">
+          <p className="bb-eyebrow">{copy.eyebrow}</p>
+          <div className="bb-rating">
+            <Stars />
+            <span className="bb-rating__score">{copy.rating}</span>
+            <a className="bb-rating__count" href="#reviews">
+              {copy.reviewCount}
+            </a>
+          </div>
+          <h1 className="bb-title">{copy.title}</h1>
+          <p className="bb-subtitle">{copy.subtitle}</p>
+
+          <fieldset className="bb-options">
+            <legend className="bb-visually-hidden">Purchase option</legend>
+
+            <label className={`bb-option${plan === "once" ? " is-selected" : ""}`}>
+              <span className="bb-option__head">
+                <input
+                  type="radio"
+                  className="bb-radio"
+                  name={groupName}
+                  checked={plan === "once"}
+                  onChange={() => setPlan("once")}
+                />
+                <span className="bb-option__label">{copy.oneTime.label}</span>
+                <span className="bb-option__price">
+                  <strong>{money(copy.oneTime.priceCents)}</strong>
+                </span>
+              </span>
+            </label>
+
+            <div className={`bb-option bb-option--sub${plan === "subscribe" ? " is-selected" : ""}`}>
+              <label className="bb-option__head">
+                <input
+                  type="radio"
+                  className="bb-radio"
+                  name={groupName}
+                  checked={plan === "subscribe"}
+                  onChange={() => setPlan("subscribe")}
+                />
+                <span className="bb-option__label">
+                  {copy.subscribe.label}
+                  <span className="bb-badge">{copy.subscribe.badge}</span>
+                </span>
+                <span className="bb-option__price">
+                  <strong>{money(copy.subscribe.priceCents)}</strong>
+                  <s>
+                    <span className="bb-visually-hidden">was </span>
+                    {money(copy.subscribe.comparePriceCents)}
+                  </s>
+                </span>
+              </label>
+
+              {plan === "subscribe" && (
+                <div className="bb-option__body">
+                  <div className="bb-frequency">
+                    <label htmlFor={freqId}>{copy.subscribe.frequencyLabel}</label>
+                    <span className="bb-select">
+                      <select id={freqId} value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+                        {copy.subscribe.frequencyOptions.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                      <Chevron />
+                    </span>
+                  </div>
+                  <ul className="bb-perks">
+                    {copy.subscribe.perks.map((p) => (
+                      <li key={p}>
+                        <Check />
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </fieldset>
+
+          <div className="bb-buy">
+            <div className="bb-qty" role="group" aria-label="Quantity">
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                disabled={qty <= MIN_QTY}
+                onClick={() => setQty((q) => Math.max(MIN_QTY, q - 1))}
+              >
+                <Minus />
+              </button>
+              <output aria-live="polite" aria-label={`Quantity ${qty}`}>
+                {qty}
+              </output>
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                disabled={qty >= MAX_QTY}
+                onClick={() => setQty((q) => Math.min(MAX_QTY, q + 1))}
+              >
+                <Plus />
+              </button>
+            </div>
+            <button type="button" className="bb-cart">
+              {copy.addToCart}
+              <span className="bb-cart__dot" aria-hidden="true">
+                ·
+              </span>
+              <span aria-live="polite">{money(totalCents)}</span>
+            </button>
+          </div>
+
+          <ul className="bb-trust">
+            {copy.trust.map((t) => (
+              <li key={t}>
+                <CheckCircle />
+                {t}
+              </li>
+            ))}
+          </ul>
+
+          {plan === "subscribe" && <p className="bb-fine">{finePrint}</p>}
+        </div>
+      </div>
+    </div>
+  );
 }
+
+/* ---------- Icons ---------- */
+
+function Stars() {
+  // The reference shows five full stars next to 4.8; matched as drawn.
+  return (
+    <span className="bb-stars" role="img" aria-label={`Rated ${copy.rating} out of 5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <svg key={i} viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 1.6l2.5 5.3 5.8.7-4.3 4 1.1 5.7L10 14.5l-5.1 2.8 1.1-5.7-4.3-4 5.8-.7z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+const Chevron = () => (
+  <svg className="bb-select__chevron" viewBox="0 0 12 12" aria-hidden="true">
+    <path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const Check = () => (
+  <svg className="bb-perks__icon" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const CheckCircle = () => (
+  <svg className="bb-trust__icon" viewBox="0 0 16 16" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M5.2 8.2l1.9 1.8 3.7-3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const Minus = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M1.5 8h13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+  </svg>
+);
+
+const Plus = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M1.5 8h13M8 1.5v13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+  </svg>
+);

@@ -1,0 +1,64 @@
+/* Review toolbar: a test harness around the two parts, not part of the design. */
+.rt-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 8px 16px;
+  font: 13px/1.2 Inter, system-ui, sans-serif;
+  color: #e9ece8;
+  background: #1c2420;
+}
+.rt-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.rt-bar a,
+.rt-bar button {
+  font: inherit;
+  color: #c9d1cb;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 9px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.rt-bar a:hover,
+.rt-bar button:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.rt-bar a[aria-current],
+.rt-bar button[aria-pressed="true"] { color: #fff; background: #17402f; border-color: #3d6b55; }
+.rt-bar a:focus-visible,
+.rt-bar button:focus-visible,
+.rt-bar input:focus-visible { outline: 2px solid #d8a23a; outline-offset: 2px; }
+.rt-px { color: #8e9a92; font-variant-numeric: tabular-nums; }
+.rt-check,
+.rt-range { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.rt-range input { width: 120px; accent-color: #d8a23a; }
+.rt-range input:disabled { opacity: 0.4; }
+.rt-check input { accent-color: #d8a23a; }
+
+/* Fixed-width preview */
+.rt-stage {
+  height: calc(100vh - 46px);
+  overflow: auto;
+  background: repeating-linear-gradient(45deg, #e9e6df 0 10px, #e2ded6 10px 20px);
+  display: flex;
+  justify-content: center;
+}
+.rt-frame {
+  flex: none;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.rt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
