@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { copy } from "./copy";
+import { Reviews } from "./Reviews";
 import "./buybox.css";
 
 // Part B: rebuild of public/reference/buy-box.png. Everything shown follows the customer's choices:
@@ -187,6 +188,7 @@ export function BuyBox() {
           {plan === "subscribe" && <p className="bb-fine">{finePrint}</p>}
         </div>
       </div>
+      <Reviews />
     </main>
   );
 }
