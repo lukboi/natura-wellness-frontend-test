@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SubscriptionCard } from "./part-a/SubscriptionCard";
 import { BuyBox } from "./part-b/BuyBox";
 import "./review-toolbar.css";
@@ -15,6 +15,8 @@ import "./review-toolbar.css";
 const params = new URLSearchParams(window.location.search);
 const part = params.get("part") === "b" ? "b" : "a";
 const embedded = params.get("embed") === "1";
+// Inside a preview frame, hide the page's scrollbar like a phone does, so "375" really is 375px wide.
+if (embedded) document.documentElement.classList.add("rt-embedded");
 
 const WIDTHS = [
   { id: "375", label: "Phone", px: 375 },
@@ -37,6 +39,12 @@ function applyOverlay(doc: Document | null | undefined, on: boolean, opacity: nu
 const initialOverlay = params.get("overlay") === "1";
 const initialOpacity = Number(params.get("opacity") ?? 50);
 const initialDiff = params.get("diff") === "1";
+const initialReviews = params.get("reviews") === "1";
+
+/** Ask the buy box (in this window or in the preview iframe) to open or close its reviews. */
+function sendReviews(win: Window | null | undefined, open: boolean) {
+  win?.dispatchEvent(new CustomEvent("bb:set-reviews", { detail: open }));
+}
 applyOverlay(document, initialOverlay, initialOpacity, initialDiff);
 
 // Each part gets its own title. The subscription page belongs to a signed-in customer, so search
@@ -59,6 +67,7 @@ function ReviewShell() {
   const [overlay, setOverlay] = useState(initialOverlay);
   const [opacity, setOpacity] = useState(initialOpacity);
   const [diff, setDiff] = useState(initialDiff);
+  const [reviews, setReviews] = useState(initialReviews);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const px = WIDTHS.find((w) => w.id === width)?.px ?? null;
 
@@ -70,30 +79,48 @@ function ReviewShell() {
       next.set("overlay", overlay ? "1" : "0");
       next.set("opacity", String(opacity));
       next.set("diff", diff ? "1" : "0");
+      next.set("reviews", reviews ? "1" : "0");
     }
     history.replaceState(null, "", `?${next}`);
     applyOverlay(document, overlay, opacity, diff);
     applyOverlay(frameRef.current?.contentDocument, overlay, opacity, diff);
-  }, [width, overlay, opacity, diff]);
+  }, [width, overlay, opacity, diff, reviews]);
 
-  // The iframe shows the same page without the toolbar. Its src only changes with the page, not the overlay.
-  const frameSrc = (() => {
+  // Reviews: the toolbar tells the page, and the page reports back when the customer opens or closes
+  // them with its own link, so the checkbox always matches.
+  useEffect(() => {
+    if (part !== "b") return;
+    sendReviews(frameRef.current?.contentWindow ?? window, reviews);
+  }, [reviews, width]);
+  useEffect(() => {
+    const onState = (e: Event) => setReviews((e as CustomEvent<boolean>).detail);
+    window.addEventListener("bb:reviews-state", onState);
+    return () => window.removeEventListener("bb:reviews-state", onState);
+  }, []);
+
+  // The iframe shows the same page without the toolbar. Its src is fixed per width (so toggling the
+  // overlay or reviews doesn't reload it), and starts with the reviews in their current state.
+  const reviewsRef = useRef(reviews);
+  reviewsRef.current = reviews;
+  const frameSrc = useMemo(() => {
     const p = new URLSearchParams(window.location.search);
-    ["width", "overlay", "opacity", "diff"].forEach((k) => p.delete(k));
+    ["width", "overlay", "opacity", "diff", "reviews"].forEach((k) => p.delete(k));
+    if (part === "b" && reviewsRef.current) p.set("reviews", "1");
     p.set("embed", "1");
     return `?${p}`;
-  })();
+  }, [width]);
 
   const fixture = params.get("fixture") ?? "active";
 
   return (
-    <>
+    // Fixed widths: the toolbar plus a stage that fills exactly the rest of the window.
+    <div className={px ? "rt-shell rt-shell--framed" : "rt-shell"}>
       <nav className="rt-bar" aria-label="Review tools">
         <div className="rt-group">
-          <a href="?part=a&fixture=active" aria-current={part === "a" ? "page" : undefined}>
+          <a href={`?part=a&fixture=active&width=${width}`} aria-current={part === "a" ? "page" : undefined}>
             Part A: Subscription page
           </a>
-          <a href="?part=b" aria-current={part === "b" ? "page" : undefined}>
+          <a href={`?part=b&width=${width}`} aria-current={part === "b" ? "page" : undefined}>
             Part B: Buy box
           </a>
         </div>
@@ -141,6 +168,15 @@ function ReviewShell() {
             </label>
           </div>
         )}
+
+        {part === "b" && (
+          <div className="rt-group">
+            <label className="rt-check" title="The reviews section below the buy box (closed for pixel checks)">
+              <input type="checkbox" checked={reviews} onChange={(e) => setReviews(e.target.checked)} />
+              Reviews
+            </label>
+          </div>
+        )}
       </nav>
 
       {px ? (
@@ -152,7 +188,10 @@ function ReviewShell() {
             title={`Preview at ${px}px`}
             src={frameSrc}
             style={{ width: px }}
-            onLoad={() => applyOverlay(frameRef.current?.contentDocument, overlay, opacity, diff)}
+            onLoad={() => {
+              applyOverlay(frameRef.current?.contentDocument, overlay, opacity, diff);
+              if (part === "b") sendReviews(frameRef.current?.contentWindow, reviews);
+            }}
           />
         </div>
       ) : part === "a" ? (
@@ -160,6 +199,6 @@ function ReviewShell() {
       ) : (
         <BuyBox />
       )}
-    </>
+    </div>
   );
 }

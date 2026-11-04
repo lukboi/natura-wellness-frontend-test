@@ -21,9 +21,11 @@ export function BuyBox() {
   const [status, setStatus] = useState("");
   // Reviews start closed so the page is exactly the reference screenshot (a taller page would add a
   // scrollbar and shift the pixel overlay). A link to #reviews opens them straight away.
-  const [reviewsOpen, setReviewsOpen] = useState(() => window.location.hash === "#reviews");
+  const [reviewsOpen, setReviewsOpen] = useState(
+    () => window.location.hash === "#reviews" || new URLSearchParams(window.location.search).get("reviews") === "1",
+  );
   // Where focus goes once the section has opened or closed (an effect runs after the DOM updates).
-  const reviewsFocus = useRef<"open" | "close" | null>(null);
+  const reviewsFocus = useRef<"open" | "close" | "scroll" | null>(null);
   const reviewsLinkRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
     const target = reviewsFocus.current;
@@ -32,10 +34,33 @@ export function BuyBox() {
       const heading = document.getElementById("reviews-title");
       heading?.scrollIntoView({ block: "start" });
       heading?.focus({ preventScroll: true });
+    } else if (target === "scroll") {
+      // Opened from the toolbar: show the section, but leave focus where the reviewer is.
+      document.getElementById("reviews")?.scrollIntoView({ block: "start" });
     } else if (target === "close") {
       reviewsLinkRef.current?.focus();
     }
   }, [reviewsOpen]);
+  // Review toolbar (test harness): it can open or close the reviews, and is told when they change.
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const open = (e as CustomEvent<boolean>).detail;
+      setReviewsOpen(open);
+      if (open) reviewsFocus.current = "scroll";
+    };
+    window.addEventListener("bb:set-reviews", onSet);
+    return () => window.removeEventListener("bb:set-reviews", onSet);
+  }, []);
+  // Report real changes only (not the starting value, and not React StrictMode's second effect run).
+  const lastReported = useRef(reviewsOpen);
+  useEffect(() => {
+    if (reviewsOpen === lastReported.current) return;
+    lastReported.current = reviewsOpen;
+    const state = new CustomEvent("bb:reviews-state", { detail: reviewsOpen });
+    window.dispatchEvent(state);
+    if (window.parent !== window) window.parent.dispatchEvent(new CustomEvent("bb:reviews-state", { detail: reviewsOpen }));
+  }, [reviewsOpen]);
+
   // A link to #reviews opens them, also when only the hash changes (no page reload).
   useEffect(() => {
     const onHash = () => {

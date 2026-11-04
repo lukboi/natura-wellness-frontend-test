@@ -39,7 +39,9 @@ Checked with axe-core (WCAG 2.2 AA + best practices) in every state of both part
 
 ## Review toolbar
 
-The dark bar at the top (`src/App.tsx`) is a test harness, not part of either part. It previews either page at Phone 375, Tablet 768 or Desktop 1200 (inside an iframe, so the page's own breakpoints apply), switches Part A's test cases, and for Part B lays the reference screenshot over the page with an opacity slider and a "Difference" mode where matching pixels turn black. The settings live in the URL, e.g. `?part=b&width=1200&overlay=1&opacity=50&diff=1`.
+The dark bar at the top (`src/App.tsx`) is a test harness, not part of either part. It previews either page at Phone 375, Tablet 768 or Desktop 1200 (inside an iframe, so the page's own breakpoints apply), switches Part A's test cases, and for Part B lays the reference screenshot over the page with an opacity slider and a "Difference" mode where matching pixels turn black. For Part B it also has a **Reviews** toggle that opens or closes the reviews section; it stays in step with the page's own "2,316 reviews" link and "Hide reviews" button. The settings live in the URL, e.g. `?part=b&width=1200&overlay=1&opacity=50&diff=1&reviews=0`.
+
+In the fixed-width previews the toolbar fills the window edge to edge, and the page inside the frame has no scrollbar (like a phone), so "375" is exactly 375px of page and the 1200px overlay stays aligned even on a long page.
 
 ### Cancellation flow
 

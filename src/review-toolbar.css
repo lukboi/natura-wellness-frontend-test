@@ -1,4 +1,16 @@
 /* Review toolbar: a test harness around the two parts, not part of the design. */
+
+/* The pages remove the browser's 8px body margin themselves, but in a fixed-width preview they live
+   inside the iframe, so the outer document has to do it too. */
+body:has(.rt-shell) { margin: 0; }
+
+/* Fixed widths: toolbar on top, stage fills exactly what's left (however tall the toolbar wraps). */
+.rt-shell--framed { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+.rt-shell--framed .rt-bar { flex: none; }
+
+/* Pages inside a preview frame: no scrollbar taking width (it still scrolls). */
+.rt-embedded { scrollbar-width: none; }
+.rt-embedded::-webkit-scrollbar { display: none; }
 .rt-bar {
   position: sticky;
   top: 0;
@@ -40,7 +52,8 @@
 
 /* Fixed-width preview */
 .rt-stage {
-  height: calc(100vh - 46px);
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   background: repeating-linear-gradient(45deg, #e9e6df 0 10px, #e2ded6 10px 20px);
   display: flex;
@@ -49,6 +62,7 @@
 .rt-frame {
   flex: none;
   height: 100%;
+  display: block;
   border: 0;
   background: #fff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 12px 40px rgba(0, 0, 0, 0.18);
