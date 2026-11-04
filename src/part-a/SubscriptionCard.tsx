@@ -25,8 +25,20 @@ const apiSkip = (sub: Subscription) =>
 export function SubscriptionCard() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [notice, setNotice] = useState<Notice>(null);
-  // The API keeps no skip history, so we can only count skips made during this visit.
-  const [skipsThisVisit, setSkipsThisVisit] = useState(0);
+  // The dates skipped during this visit, oldest first. The API keeps no skip history, so this is per visit.
+  // Its length is the "N in a row" count, and its last entry is what Undo restores.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const skipsThisVisit = skipped.length;
+  // Undo only makes sense while the skipped date is still ahead of us.
+  const undoDate = skipped.length > 0 && Date.parse(skipped[skipped.length - 1]) > Date.now() ? skipped[skipped.length - 1] : null;
+
+  function undoSkip(current: Subscription) {
+    if (!undoDate) return;
+    // There is no "unskip" in the API, so this runs on the local copy (see README).
+    setLocal({ ...current, nextChargeAt: undoDate, updatedAt: new Date().toISOString() });
+    setSkipped((s) => s.slice(0, -1));
+    setNotice({ tone: "success", text: `Undone. Your ${formatDate(undoDate)} shipment is back on.` });
+  }
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restartOpen, setRestartOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -55,7 +67,10 @@ export function SubscriptionCard() {
   return (
     <div className="sub-shell">
       <main className="sub-page">
-        <h1 className="sub-title">Your subscription</h1>
+        <header className="sub-header">
+          <p className="sub-header__eyebrow">My account</p>
+          <h1 className="sub-title">Your subscription</h1>
+        </header>
 
         <div aria-live="polite">
           {notice && (
@@ -86,6 +101,8 @@ export function SubscriptionCard() {
                 setNotice(null);
                 setCancelOpen(true);
               }}
+              undoDate={undoDate}
+              onUndo={() => undoSkip(local ?? state.sub)}
             />
             {cancelOpen && (
               <CancelFlow
@@ -93,6 +110,7 @@ export function SubscriptionCard() {
                 onClose={() => setCancelOpen(false)}
                 onApply={(updated, text) => {
                   setLocal(updated);
+                  setSkipped([]); // a new schedule makes the old skip dates meaningless
                   setCancelOpen(false);
                   setNotice({ tone: "success", text });
                 }}
@@ -102,6 +120,7 @@ export function SubscriptionCard() {
                 }}
                 onCancelled={(cancelled) => {
                   setLocal(cancelled);
+                  setSkipped([]);
                   setCancelOpen(false);
                   setNotice({
                     tone: "info",
@@ -116,7 +135,7 @@ export function SubscriptionCard() {
                 onClose={() => setRestartOpen(false)}
                 onConfirm={(restarted, wasPaused) => {
                   setLocal(restarted);
-                  setSkipsThisVisit(0);
+                  setSkipped([]);
                   setRestartOpen(false);
                   setNotice({
                     tone: "success",
@@ -132,7 +151,7 @@ export function SubscriptionCard() {
                 skipsThisVisit={skipsThisVisit}
                 onClose={() => setConfirmOpen(false)}
                 onSubscriptionChange={(sub) => (local ? setLocal(sub) : setState({ kind: "ready", sub }))}
-                onSkipped={() => setSkipsThisVisit((n) => n + 1)}
+                onSkipped={(date) => setSkipped((s) => [...s, date])}
                 onDone={(n) => {
                   setConfirmOpen(false);
                   setNotice(n);
@@ -153,103 +172,168 @@ interface ViewProps {
   onSkip: () => void;
   onRestart: () => void;
   onCancel: () => void;
+  /** The most recently skipped date, if it can still be undone. */
+  undoDate: string | null;
+  onUndo: () => void;
 }
 
-function SubscriptionView({ sub, onSkip, onRestart, onCancel }: ViewProps) {
+function SubscriptionView({ sub, onSkip, onRestart, onCancel, undoDate, onUndo }: ViewProps) {
   const cancelLink = (
     <button type="button" className="sub-link sub-link--block" onClick={onCancel}>
       Cancel subscription
     </button>
   );
+  const perShipment = sub.nextChargeTotalCents ?? totalAfterDiscount(sub.items, sub.discountPercent);
+  const subtotal = sub.items.reduce((s, i) => s + i.unitPriceCents * i.quantity, 0);
+
   if (sub.status === "active" && sub.nextChargeAt && sub.nextChargeTotalCents != null) {
-    const subtotal = sub.items.reduce((s, i) => s + i.unitPriceCents * i.quantity, 0);
+    const next = sub.nextChargeAt;
     return (
-      <section className="sub-card" aria-labelledby="next-heading">
-        <StatusPill status="active" intervalDays={sub.intervalDays} />
-        <h2 className="sub-eyebrow" id="next-heading">
-          Next shipment
-        </h2>
-        <p className="sub-date">
-          {formatDate(sub.nextChargeAt)} <span className="sub-date__rel">· {relativeDays(sub.nextChargeAt)}</span>
-        </p>
-        <div className="sub-total">
-          <span className="sub-total__amount">{formatMoney(sub.nextChargeTotalCents)}</span>
-          {subtotal > sub.nextChargeTotalCents && (
-            <span className="sub-total__save">
-              <s aria-label={`was ${formatMoney(subtotal)}`}>{formatMoney(subtotal)}</s> You save {sub.discountPercent}%
-            </span>
-          )}
-        </div>
-        <p className="sub-muted">
-          Charged on {formatShortDate(sub.nextChargeAt)}, then every {sub.intervalDays} days.
-        </p>
-
-        <ItemList items={sub.items} />
-
-        <div className="sub-actions">
-          <button type="button" className="sub-btn sub-btn--secondary" onClick={onSkip}>
-            Skip this shipment
-          </button>
-          {cancelLink}
-        </div>
-      </section>
+      <Layout
+        label="Your next shipment"
+        items={<ItemList sub={sub} />}
+        summary={
+          <>
+            <div className="sub-badges">
+              <span className="sub-badge sub-badge--active">Active</span>
+              <span className="sub-badges__meta">Every {sub.intervalDays} days</span>
+            </div>
+            <h2 className="sub-eyebrow">
+              <Sun className="sub-eyebrow__sun" /> Next shipment
+            </h2>
+            <p className="sub-date">{formatDate(next)}</p>
+            <p className="sub-date__rel">{capitalize(relativeDays(next))}</p>
+            {undoDate && (
+              <p className="sub-undo">
+                <span>You skipped your {formatShortDate(undoDate)} shipment.</span>
+                <button type="button" className="sub-undo__btn" onClick={onUndo}>
+                  Undo
+                </button>
+              </p>
+            )}
+            <div className="sub-charge">
+              <div className="sub-charge__row">
+                <span className="sub-charge__label">You'll be charged</span>
+                <span className="sub-charge__price">
+                  <strong>{formatMoney(sub.nextChargeTotalCents)}</strong>
+                  {subtotal > sub.nextChargeTotalCents && (
+                    <s aria-label={`was ${formatMoney(subtotal)}`}>{formatMoney(subtotal)}</s>
+                  )}
+                </span>
+              </div>
+              <p className="sub-charge__when">
+                On {formatShortDate(next)}, then every {sub.intervalDays} days.
+              </p>
+              <ul className="sub-checks">
+                <li>{sub.discountPercent}% off every shipment</li>
+                <li>Skip, pause, or cancel anytime</li>
+              </ul>
+            </div>
+          </>
+        }
+        actions={
+          <>
+            <button type="button" className="sub-btn sub-btn--secondary" onClick={onSkip}>
+              Skip this shipment
+            </button>
+            {cancelLink}
+          </>
+        }
+      />
     );
   }
 
   if (sub.status === "paused") {
     return (
-      <section className="sub-card sub-card--inactive" aria-label="Paused subscription">
-        <StatusPill status="paused" />
-        {sub.pausedUntil ? (
+      <Layout
+        label="Paused subscription"
+        inactive
+        items={<ItemList sub={sub} heading="When it resumes, you'll get" />}
+        summary={
           <>
-            <p className="sub-date">Resumes {formatDate(sub.pausedUntil)}</p>
-            <p className="sub-muted">That's {relativeDays(sub.pausedUntil)}. You won't be charged until then.</p>
+            <div className="sub-badges">
+              <span className="sub-badge sub-badge--paused">Paused</span>
+              <span className="sub-badges__meta">Every {sub.intervalDays} days</span>
+            </div>
+            <h2 className="sub-eyebrow">Resumes</h2>
+            {sub.pausedUntil ? (
+              <>
+                <p className="sub-date">{formatDate(sub.pausedUntil)}</p>
+                <p className="sub-date__rel">{capitalize(relativeDays(sub.pausedUntil))}. No charges until then.</p>
+              </>
+            ) : (
+              <p className="sub-date__rel">You won't be charged while your subscription is paused.</p>
+            )}
+            <div className="sub-charge sub-charge--muted">
+              <div className="sub-charge__row">
+                <span className="sub-charge__label">Per shipment</span>
+                <span className="sub-charge__price">
+                  <strong>{formatMoney(perShipment)}</strong>
+                </span>
+              </div>
+              <p className="sub-charge__when">Every {sub.intervalDays} days once it resumes.</p>
+            </div>
           </>
-        ) : (
-          <p className="sub-muted">You won't be charged while your subscription is paused.</p>
-        )}
-        <ItemList items={sub.items} heading="When it resumes, you'll get" />
-        <p className="sub-muted">
-          About {formatMoney(totalAfterDiscount(sub.items, sub.discountPercent))} per shipment, every {sub.intervalDays}{" "}
-          days.
-        </p>
-        <div className="sub-actions">
-          <button type="button" className="sub-btn sub-btn--primary" onClick={onRestart}>
-            Resume now
-          </button>
-          {sub.pausedUntil && (
-            <p className="sub-hint">Or do nothing, and it resumes on its own on {formatShortDate(sub.pausedUntil)}.</p>
-          )}
-          {cancelLink}
-        </div>
-      </section>
+        }
+        actions={
+          <>
+            <button type="button" className="sub-btn sub-btn--primary" onClick={onRestart}>
+              Resume now
+            </button>
+            {sub.pausedUntil && (
+              <p className="sub-hint">Or do nothing, and it resumes on its own on {formatShortDate(sub.pausedUntil)}.</p>
+            )}
+            {cancelLink}
+          </>
+        }
+      />
     );
   }
 
   if (sub.status === "cancelled") {
     return (
-      <section className="sub-card sub-card--inactive" aria-label="Cancelled subscription">
-        <StatusPill status="cancelled" />
-        <p className="sub-date">{sub.cancelledAt ? `Cancelled on ${formatDate(sub.cancelledAt)}` : "Cancelled"}</p>
-        <p className="sub-muted">No more shipments or charges are scheduled.</p>
-        <ItemList items={sub.items} heading="What you were getting" />
-        <div className="sub-actions">
-          <button type="button" className="sub-btn sub-btn--primary" onClick={onRestart}>
-            Resubscribe and save {sub.discountPercent}%
-          </button>
-          <p className="sub-hint">
-            Same products, {formatMoney(totalAfterDiscount(sub.items, sub.discountPercent))} every {sub.intervalDays} days.
-            Cancel anytime.
-          </p>
-        </div>
-      </section>
+      <Layout
+        label="Cancelled subscription"
+        inactive
+        items={<ItemList sub={sub} heading="What you were getting" />}
+        summary={
+          <>
+            <div className="sub-badges">
+              <span className="sub-badge sub-badge--cancelled">Cancelled</span>
+            </div>
+            <h2 className="sub-eyebrow">Cancelled on</h2>
+            <p className="sub-date">{sub.cancelledAt ? formatDate(sub.cancelledAt) : "Cancelled"}</p>
+            <p className="sub-date__rel">No more shipments or charges are scheduled.</p>
+            <div className="sub-charge">
+              <div className="sub-charge__row">
+                <span className="sub-charge__label">
+                  Come back and save {sub.discountPercent}%
+                </span>
+                <span className="sub-charge__price">
+                  <strong>{formatMoney(perShipment)}</strong>
+                  {subtotal > perShipment && <s aria-label={`was ${formatMoney(subtotal)}`}>{formatMoney(subtotal)}</s>}
+                </span>
+              </div>
+              <p className="sub-charge__when">Same products, every {sub.intervalDays} days.</p>
+            </div>
+          </>
+        }
+        actions={
+          <>
+            <button type="button" className="sub-btn sub-btn--primary" onClick={onRestart}>
+              Resubscribe and save {sub.discountPercent}%
+            </button>
+            <p className="sub-hint">Skip, pause, or cancel anytime.</p>
+          </>
+        }
+      />
     );
   }
 
   // Active but missing its next charge: data we don't expect. Don't guess, say so.
   return (
-    <section className="sub-card sub-card--inactive">
-      <p className="sub-date">We can't show your next shipment right now</p>
+    <section className="sub-card sub-card--narrow">
+      <p className="sub-date sub-date--sm">We can't show your next shipment right now</p>
       <p className="sub-muted">
         Please contact us at <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> and we'll sort it out.
       </p>
@@ -257,27 +341,80 @@ function SubscriptionView({ sub, onSkip, onRestart, onCancel }: ViewProps) {
   );
 }
 
-function StatusPill({ status, intervalDays }: { status: Subscription["status"]; intervalDays?: number }) {
-  const label =
-    status === "active" ? `Active · every ${intervalDays} days` : status === "paused" ? "Paused" : "Cancelled";
-  return <span className={`sub-pill sub-pill--${status}`}>{label}</span>;
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * One card on phones (summary, items, actions stacked). On desktop it opens into two columns like the
+ * product page: the shipment's products in a large card on the left, the details and actions on the right.
+ */
+function Layout({
+  label,
+  inactive,
+  summary,
+  items,
+  actions,
+}: {
+  label: string;
+  inactive?: boolean;
+  summary: React.ReactNode;
+  items: React.ReactNode;
+  actions: React.ReactNode;
+}) {
+  return (
+    <section className={`sub-layout${inactive ? " sub-layout--inactive" : ""}`} aria-label={label}>
+      <div className="sub-layout__summary">{summary}</div>
+      <div className="sub-layout__items">{items}</div>
+      <div className="sub-layout__actions">{actions}</div>
+    </section>
+  );
 }
 
-function ItemList({ items, heading = "In this shipment" }: { items: SubscriptionItem[]; heading?: string }) {
+/** The gold sun from the Natura Wellness label. */
+function Sun({ className }: { className?: string }) {
+  const rays = Array.from({ length: 8 }, (_, i) => i * 45);
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+      <circle cx="12" cy="12" r="4.5" />
+      {rays.map((deg) => (
+        <line key={deg} x1="12" y1="2.5" x2="12" y2="4.8" transform={`rotate(${deg} 12 12)`} />
+      ))}
+    </svg>
+  );
+}
+
+function ProductTile({ item, large }: { item: SubscriptionItem; large?: boolean }) {
+  if (item.imageUrl) return <img className="sub-tile" src={item.imageUrl} alt="" />;
+  // No photo: a cream "label" in the style of the bottle, with the brand's sun. The large one also
+  // carries the brand and product name, like the label on the Vitamin D bottle.
+  return (
+    <span className="sub-tile sub-tile--label" aria-hidden="true">
+      {large && <span className="sub-tile__brand">Natura Wellness</span>}
+      {large && <span className="sub-tile__name">{item.name.split(",")[0].split(" (")[0]}</span>}
+      <Sun className="sub-tile__sun" />
+    </span>
+  );
+}
+
+function ItemList({ sub, heading = "In this shipment" }: { sub: Subscription; heading?: string }) {
   return (
     <div className="sub-items">
+      {/* Desktop only: the products shown large, like the photo card on the product page. */}
+      <div className="sub-shelf" aria-hidden="true">
+        {sub.items.map((item) => (
+          <ProductTile key={item.sku} item={item} large />
+        ))}
+      </div>
       <h3 className="sub-items__heading">{heading}</h3>
       <ul>
-        {items.map((item) => (
+        {sub.items.map((item) => (
           <li key={item.sku} className="sub-item">
-            {item.imageUrl ? (
-              <img className="sub-item__img" src={item.imageUrl} alt="" />
-            ) : (
-              <span className="sub-item__img sub-item__img--empty" aria-hidden="true">
-                {item.name.charAt(0)}
+            <ProductTile item={item} />
+            <span className="sub-item__text">
+              <span className="sub-item__name">{item.name}</span>
+              <span className="sub-item__price">
+                {formatMoney(Math.round((item.unitPriceCents * (100 - sub.discountPercent)) / 100))} each
               </span>
-            )}
-            <span className="sub-item__name">{item.name}</span>
+            </span>
             <span className="sub-item__qty" aria-label={`quantity ${item.quantity}`}>
               ×{item.quantity}
             </span>
@@ -292,7 +429,7 @@ function ItemList({ items, heading = "In this shipment" }: { items: Subscription
 
 function Skeleton() {
   return (
-    <div className="sub-card" role="status" aria-label="Loading your subscription">
+    <div className="sub-card sub-card--narrow" role="status" aria-label="Loading your subscription">
       <span className="sk sk--pill" />
       <span className="sk sk--line" style={{ width: "40%" }} />
       <span className="sk sk--date" />
@@ -306,17 +443,17 @@ function Skeleton() {
 
 function LoadError({ notFound, onRetry }: { notFound: boolean; onRetry: () => void }) {
   return (
-    <section className="sub-card" role="alert">
+    <section className="sub-card sub-card--narrow" role="alert">
       {notFound ? (
         <>
-          <p className="sub-date">We couldn't find a subscription</p>
+          <p className="sub-date sub-date--sm">We couldn't find a subscription</p>
           <p className="sub-muted">
             If you think you should have one, contact us at <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
         </>
       ) : (
         <>
-          <p className="sub-date">We couldn't load your subscription</p>
+          <p className="sub-date sub-date--sm">We couldn't load your subscription</p>
           <p className="sub-muted">
             This is a problem on our side, and nothing about your subscription has changed. Try again, or contact us at{" "}
             <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> if it keeps happening.
@@ -340,7 +477,8 @@ interface SkipDialogProps {
   skipsThisVisit: number;
   onClose: () => void;
   onSubscriptionChange: (sub: Subscription) => void;
-  onSkipped: () => void;
+  /** Called with the date that was skipped, so it can be undone. */
+  onSkipped: (skippedDate: string) => void;
   onDone: (notice: Notice) => void;
 }
 
@@ -366,7 +504,7 @@ function SkipDialog({ sub, skip, skipsThisVisit, onClose, onSubscriptionChange, 
     try {
       const updated = await skip(sub);
       onSubscriptionChange(updated);
-      onSkipped();
+      onSkipped(current);
       onDone({
         tone: "success",
         text: `Done. Your ${formatShortDate(current)} shipment is skipped, and your next charge is ${formatDate(updated.nextChargeAt!)}.`,
