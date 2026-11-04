@@ -6,7 +6,8 @@
   --bb-line-strong: #e1dbcf;
   --bb-ink: #1c2420;
   --bb-body: #4a5550;
-  --bb-muted: #6b7a70;
+  --bb-muted: #66746a; /* reference #6b7a70 is 4.27:1 on the cream; nudged to pass WCAG AA (4.5:1) */
+  --bb-focus: #17402f;
   --bb-green: #17402f;
   --bb-green-tint: #f3f6f2;
   --bb-gold: #d8a23a;
@@ -145,7 +146,7 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
 .bb-option--sub .bb-option__label { padding-top: 8px; }
 .bb-option__price { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
 .bb-option__price strong { font-size: 17px; line-height: 24px; font-weight: 700; }
-.bb-option__price s { font-size: 13px; line-height: 16px; color: #8a948e; }
+.bb-option__price s { font-size: 13px; line-height: 16px; color: #6a726e; /* reference #8a948e is 2.87:1 */ }
 
 .bb-radio {
   appearance: none;
@@ -153,7 +154,7 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   width: 20px;
   height: 20px;
   margin: 0;
-  border: 1.5px solid #b9c0bb;
+  border: 1.5px solid #919692; /* 3:1 so the empty radio is visible */
   border-radius: 50%;
   background: var(--bb-surface);
   display: grid;
@@ -169,7 +170,7 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   border-radius: 50%;
   background: var(--bb-green);
 }
-.bb-radio:focus-visible { outline: 3px solid #8fb89c; outline-offset: 2px; }
+.bb-radio:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 2px; }
 
 .bb-badge {
   font-size: 11px;
@@ -199,7 +200,7 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   border-radius: 8px;
   cursor: pointer;
 }
-.bb-select select:focus-visible { outline: 3px solid #8fb89c; outline-offset: 1px; }
+.bb-select select:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 1px; }
 .bb-select__chevron {
   position: absolute;
   right: 12px;
@@ -238,9 +239,9 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   border-radius: 12px;
 }
 .bb-qty button svg { width: 10px; height: 10px; }
-.bb-qty button:disabled { color: #b9c0bb; cursor: default; }
-.bb-qty button:focus-visible { outline: 3px solid #8fb89c; outline-offset: -3px; }
-.bb-qty output { font-size: 16px; font-weight: 500; min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.bb-qty button[aria-disabled="true"] { color: #b9c0bb; cursor: default; }
+.bb-qty button:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: -3px; }
+.bb-qty__value { font-size: 16px; font-weight: 500; min-width: 16px; text-align: center; }
 
 .bb-cart {
   flex: 1;
@@ -256,10 +257,9 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   border: 0;
   border-radius: 12px;
   cursor: pointer;
-  font-variant-numeric: tabular-nums;
 }
 .bb-cart:hover { background: #0f3123; }
-.bb-cart:focus-visible { outline: 3px solid #8fb89c; outline-offset: 2px; }
+.bb-cart:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 2px; }
 .bb-cart__dot { opacity: 0.7; }
 
 /* ---------- Trust and fine print ---------- */
@@ -302,4 +302,11 @@ body:has(.bb-page) { margin: 0; background: #fbf8f3; }
   .bb-buy { height: 56px; }
   .bb-qty { width: 116px; }
   .bb-cart { font-size: 16px; }
+}
+
+/* Smallest phones: keep "Add to cart · $299.50" on one line. */
+@media (max-width: 359px) {
+  .bb-buy { gap: 8px; }
+  .bb-qty { width: 100px; grid-template-columns: 34px 1fr 34px; }
+  .bb-cart { gap: 6px; padding: 0 10px; white-space: nowrap; font-size: 15px; }
 }

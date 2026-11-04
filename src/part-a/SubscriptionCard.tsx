@@ -25,6 +25,18 @@ const apiSkip = (sub: Subscription) =>
 export function SubscriptionCard() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [notice, setNotice] = useState<Notice>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const focusNoticeNext = useRef(false);
+  /** Show an outcome. Pass focus=true when the button that was used no longer exists, so keyboard
+   *  and screen-reader users aren't dropped at the top of the page. */
+  const announce = (n: Notice, focus = false) => {
+    focusNoticeNext.current = focus;
+    setNotice(n);
+  };
+  useEffect(() => {
+    if (notice && focusNoticeNext.current) noticeRef.current?.focus();
+    focusNoticeNext.current = false;
+  }, [notice]);
   // The dates skipped during this visit, oldest first. The API keeps no skip history, so this is per visit.
   // Its length is the "N in a row" count, and its last entry is what Undo restores.
   const [skipped, setSkipped] = useState<string[]>([]);
@@ -37,7 +49,7 @@ export function SubscriptionCard() {
     // There is no "unskip" in the API, so this runs on the local copy (see README).
     setLocal({ ...current, nextChargeAt: undoDate, updatedAt: new Date().toISOString() });
     setSkipped((s) => s.slice(0, -1));
-    setNotice({ tone: "success", text: `Undone. Your ${formatDate(undoDate)} shipment is back on.` });
+    announce({ tone: "success", text: `Undone. Your ${formatDate(undoDate)} shipment is back on.` }, true);
   }
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restartOpen, setRestartOpen] = useState(false);
@@ -74,7 +86,7 @@ export function SubscriptionCard() {
 
         <div aria-live="polite">
           {notice && (
-            <div className={`sub-notice sub-notice--${notice.tone}`}>
+            <div className={`sub-notice sub-notice--${notice.tone}`} ref={noticeRef} tabIndex={-1}>
               <p>{notice.text}</p>
               <button type="button" className="sub-notice__close" aria-label="Dismiss message" onClick={() => setNotice(null)}>
                 ×
@@ -112,7 +124,8 @@ export function SubscriptionCard() {
                   setLocal(updated);
                   setSkipped([]); // a new schedule makes the old skip dates meaningless
                   setCancelOpen(false);
-                  setNotice({ tone: "success", text });
+                  // The page re-renders into a new layout, so put focus on the outcome.
+                  announce({ tone: "success", text }, true);
                 }}
                 onSkipInstead={() => {
                   setCancelOpen(false);
@@ -122,10 +135,13 @@ export function SubscriptionCard() {
                   setLocal(cancelled);
                   setSkipped([]);
                   setCancelOpen(false);
-                  setNotice({
-                    tone: "info",
-                    text: "Your subscription is cancelled. You won't be charged again. If you change your mind, you can resubscribe below.",
-                  });
+                  announce(
+                    {
+                      tone: "info",
+                      text: "Your subscription is cancelled. You won't be charged again. If you change your mind, you can resubscribe below.",
+                    },
+                    true,
+                  );
                 }}
               />
             )}
@@ -137,10 +153,13 @@ export function SubscriptionCard() {
                   setLocal(restarted);
                   setSkipped([]);
                   setRestartOpen(false);
-                  setNotice({
-                    tone: "success",
-                    text: `${wasPaused ? "Welcome back! Your subscription is active again" : "You're subscribed again"}. Your next shipment is charged ${formatDate(restarted.nextChargeAt!)}.`,
-                  });
+                  announce(
+                    {
+                      tone: "success",
+                      text: `${wasPaused ? "Welcome back! Your subscription is active again" : "You're subscribed again"}. Your next shipment is charged ${formatDate(restarted.nextChargeAt!)}.`,
+                    },
+                    true,
+                  );
                 }}
               />
             )}
@@ -154,7 +173,7 @@ export function SubscriptionCard() {
                 onSkipped={(date) => setSkipped((s) => [...s, date])}
                 onDone={(n) => {
                   setConfirmOpen(false);
-                  setNotice(n);
+                  announce(n, true);
                 }}
               />
             )}
@@ -201,7 +220,9 @@ function SubscriptionView({ sub, onSkip, onRestart, onCancel, undoDate, onUndo }
             <h2 className="sub-eyebrow">
               <Sun className="sub-eyebrow__sun" /> Next shipment
             </h2>
-            <p className="sub-date">{formatDate(next)}</p>
+            <p className="sub-date">
+              <time dateTime={next}>{formatDate(next)}</time>
+            </p>
             <p className="sub-date__rel">{capitalize(relativeDays(next))}</p>
             {undoDate && (
               <p className="sub-undo">
@@ -217,7 +238,7 @@ function SubscriptionView({ sub, onSkip, onRestart, onCancel, undoDate, onUndo }
                 <span className="sub-charge__price">
                   <strong>{formatMoney(sub.nextChargeTotalCents)}</strong>
                   {subtotal > sub.nextChargeTotalCents && (
-                    <s aria-label={`was ${formatMoney(subtotal)}`}>{formatMoney(subtotal)}</s>
+                    <s><span className="sub-visually-hidden">Was </span>{formatMoney(subtotal)}</s>
                   )}
                 </span>
               </div>
@@ -311,7 +332,7 @@ function SubscriptionView({ sub, onSkip, onRestart, onCancel, undoDate, onUndo }
                 </span>
                 <span className="sub-charge__price">
                   <strong>{formatMoney(perShipment)}</strong>
-                  {subtotal > perShipment && <s aria-label={`was ${formatMoney(subtotal)}`}>{formatMoney(subtotal)}</s>}
+                  {subtotal > perShipment && <s><span className="sub-visually-hidden">Was </span>{formatMoney(subtotal)}</s>}
                 </span>
               </div>
               <p className="sub-charge__when">Same products, every {sub.intervalDays} days.</p>
@@ -415,8 +436,10 @@ function ItemList({ sub, heading = "In this shipment" }: { sub: Subscription; he
                 {formatMoney(Math.round((item.unitPriceCents * (100 - sub.discountPercent)) / 100))} each
               </span>
             </span>
-            <span className="sub-item__qty" aria-label={`quantity ${item.quantity}`}>
-              ×{item.quantity}
+            <span className="sub-item__qty">
+              <span className="sub-visually-hidden">Quantity: </span>
+              <span aria-hidden="true">×</span>
+              {item.quantity}
             </span>
           </li>
         ))}
@@ -429,7 +452,8 @@ function ItemList({ sub, heading = "In this shipment" }: { sub: Subscription; he
 
 function Skeleton() {
   return (
-    <div className="sub-card sub-card--narrow" role="status" aria-label="Loading your subscription">
+    <div className="sub-card sub-card--narrow" role="status">
+      <span className="sub-visually-hidden">Loading your subscription…</span>
       <span className="sk sk--pill" />
       <span className="sk sk--line" style={{ width: "40%" }} />
       <span className="sk sk--date" />
@@ -488,10 +512,18 @@ function SkipDialog({ sub, skip, skipsThisVisit, onClose, onSubscriptionChange, 
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState(0);
 
+  const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement as HTMLElement | null;
     if (dialog && !dialog.open) dialog.showModal();
-    return () => dialog?.close();
+    // Start on the question itself: screen readers read it, and Enter can't confirm by accident.
+    titleRef.current?.focus();
+    return () => {
+      dialog?.close();
+      // React removes the dialog before the browser can return focus, so do it here.
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
 
   if (sub.status !== "active" || !sub.nextChargeAt || sub.nextChargeTotalCents == null) return null;
@@ -575,7 +607,7 @@ function SkipDialog({ sub, skip, skipsThisVisit, onClose, onSubscriptionChange, 
       }}
     >
       <div className="sub-dialog__body">
-        <h2 id="skip-title" className="sub-dialog__title">
+        <h2 id="skip-title" className="sub-dialog__title" tabIndex={-1} ref={titleRef}>
           Skip your {formatShortDate(current)} shipment?
         </h2>
         <div id="skip-desc">
@@ -625,10 +657,18 @@ function RestartDialog({
   const ref = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
 
+  const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement as HTMLElement | null;
     if (dialog && !dialog.open) dialog.showModal();
-    return () => dialog?.close();
+    // Start on the question itself: screen readers read it, and Enter can't confirm by accident.
+    titleRef.current?.focus();
+    return () => {
+      dialog?.close();
+      // React removes the dialog before the browser can return focus, so do it here.
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
 
   const wasPaused = sub.status === "paused";
@@ -655,7 +695,7 @@ function RestartDialog({
       }}
     >
       <div className="sub-dialog__body">
-        <h2 id="restart-title" className="sub-dialog__title">
+        <h2 id="restart-title" className="sub-dialog__title" tabIndex={-1} ref={titleRef}>
           {wasPaused ? "Resume your subscription now?" : "Restart your subscription?"}
         </h2>
         <div id="restart-desc">

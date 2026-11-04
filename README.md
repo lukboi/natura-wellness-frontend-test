@@ -26,6 +26,17 @@ You can add any libraries you like.
 - **Everything follows the customer's choices.** Quantity (1–10) multiplies the Add to cart total and the renewal fine print; the option rows keep the per-unit price, as in the reference. Frequency updates the fine print. Choosing one-time collapses the subscription details and hides the fine print; switching back keeps the frequency that was chosen. `copy.finePrint` is written for the default choice, so the frequency and amount are swapped in.
 - **Narrower screens.** Two columns down to 900px, then the photo stacks above the details.
 
+## Accessibility and SEO
+
+Checked with axe-core (WCAG 2.2 AA + best practices) in every state of both parts: zero violations. Also checked by hand with the accessibility tree, keyboard only, at 320px and 200% zoom.
+
+- **Contrast over pixel match, in two places.** The reference's grey text (`#6b7a70`) is 4.27:1 on the cream and its struck-through price (`#8a948e`) 2.87:1; WCAG AA needs 4.5:1. Part B uses `#66746a` and `#6a726e` instead. The empty radio ring and focus rings were also darkened to reach 3:1.
+- **Screen readers hear what sighted users see.** Old prices are read as "Was $29.95"; quantities as "Quantity: 2"; the rating once ("Rated 4.8 out of 5"); one polite message after a quantity change ("Quantity 3. Total $76.38.").
+- **Focus never gets lost.** Sheets open on their question (so Enter can't confirm by accident) and hand focus back to the button that opened them. When an action removes that button (undo, cancel, resume, a successful skip), focus moves to the message saying what happened. Quantity buttons use `aria-disabled` at 1 and 10, so focus stays on them.
+- **Images.** The product photo has descriptive alt text; the small product tiles in Part A are decorative (`alt=""`), because the product name sits right next to them.
+- **SEO.** Part B: page title, meta description, Open Graph tags, one `h1`, and schema.org `Product` data (price, brand, rating) for rich results. Part A is a signed-in account page, so it's `noindex`.
+- **Not fixed:** "2,316 reviews" links to `#reviews`, but the design has no reviews section to link to.
+
 ## Review toolbar
 
 The dark bar at the top (`src/App.tsx`) is a test harness, not part of either part. It previews either page at Phone 375, Tablet 768 or Desktop 1200 (inside an iframe, so the page's own breakpoints apply), switches Part A's test cases, and for Part B lays the reference screenshot over the page with an opacity slider and a "Difference" mode where matching pixels turn black. The settings live in the URL, e.g. `?part=b&width=1200&overlay=1&opacity=50&diff=1`.

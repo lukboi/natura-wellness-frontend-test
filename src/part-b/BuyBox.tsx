@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { copy } from "./copy";
 import "./buybox.css";
 
@@ -16,6 +16,8 @@ export function BuyBox() {
   const [plan, setPlan] = useState<Plan>("subscribe");
   const [frequency, setFrequency] = useState(copy.subscribe.frequencyOptions[0]);
   const [qty, setQty] = useState(1);
+  // One polite message for screen readers after a quantity change, instead of two live regions.
+  const [status, setStatus] = useState("");
   const groupName = useId();
   const freqId = useId();
 
@@ -24,23 +26,43 @@ export function BuyBox() {
 
   // copy.finePrint is written for the default (30 days, $25.46). Swap in the customer's choices so it
   // always matches what they'll actually be charged.
+  // Functional update, so fast repeated clicks each count (a stale qty would make them all land on +1).
+  const qtyChanged = useRef(false);
+  function changeQty(delta: number) {
+    qtyChanged.current = true;
+    setQty((q) => Math.min(MAX_QTY, Math.max(MIN_QTY, q + delta)));
+  }
+  useEffect(() => {
+    if (qtyChanged.current) setStatus(`Quantity ${qty}. Total ${money(totalCents)}.`);
+    qtyChanged.current = false;
+  }, [qty, totalCents]);
+
   const finePrint = copy.finePrint
     .replace(copy.subscribe.frequencyOptions[0], frequency)
     .replace(money(copy.subscribe.priceCents), money(totalCents));
 
   return (
-    <div className="bb-page">
+    <main className="bb-page">
+      <ProductJsonLd />
       <div className="bb-ref" aria-hidden="true" />
       <div className="bb">
         <div className="bb-media">
-          <img src="/product.jpg" alt="Natura Wellness Vitamin D, 60 softgels" width={1024} height={1024} />
+          <img
+            src="/product.jpg"
+            alt="Bottle of Natura Wellness Vitamin D, 60 softgels"
+            width={1024}
+            height={1024}
+            fetchPriority="high"
+          />
         </div>
 
         <div className="bb-info">
           <p className="bb-eyebrow">{copy.eyebrow}</p>
           <div className="bb-rating">
             <Stars />
-            <span className="bb-rating__score">{copy.rating}</span>
+            <span className="bb-rating__score" aria-hidden="true">
+              {copy.rating}
+            </span>
             <a className="bb-rating__count" href="#reviews">
               {copy.reviewCount}
             </a>
@@ -119,22 +141,24 @@ export function BuyBox() {
 
           <div className="bb-buy">
             <div className="bb-qty" role="group" aria-label="Quantity">
+              {/* aria-disabled, not disabled: a disabled button drops keyboard focus to the top of the page */}
               <button
                 type="button"
                 aria-label="Decrease quantity"
-                disabled={qty <= MIN_QTY}
-                onClick={() => setQty((q) => Math.max(MIN_QTY, q - 1))}
+                aria-disabled={qty <= MIN_QTY}
+                onClick={() => changeQty(-1)}
               >
                 <Minus />
               </button>
-              <output aria-live="polite" aria-label={`Quantity ${qty}`}>
+              <span className="bb-qty__value">
+                <span className="bb-visually-hidden">Quantity </span>
                 {qty}
-              </output>
+              </span>
               <button
                 type="button"
                 aria-label="Increase quantity"
-                disabled={qty >= MAX_QTY}
-                onClick={() => setQty((q) => Math.min(MAX_QTY, q + 1))}
+                aria-disabled={qty >= MAX_QTY}
+                onClick={() => changeQty(1)}
               >
                 <Plus />
               </button>
@@ -144,9 +168,12 @@ export function BuyBox() {
               <span className="bb-cart__dot" aria-hidden="true">
                 ·
               </span>
-              <span aria-live="polite">{money(totalCents)}</span>
+              <span>{money(totalCents)}</span>
             </button>
           </div>
+          <p className="bb-visually-hidden" aria-live="polite">
+            {status}
+          </p>
 
           <ul className="bb-trust">
             {copy.trust.map((t) => (
@@ -160,8 +187,33 @@ export function BuyBox() {
           {plan === "subscribe" && <p className="bb-fine">{finePrint}</p>}
         </div>
       </div>
-    </div>
+    </main>
   );
+}
+
+/** Product, price and rating data for search results (schema.org). */
+function ProductJsonLd() {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: `${copy.title}, 60 softgels`,
+    description: copy.subtitle,
+    image: "/product.jpg",
+    brand: { "@type": "Brand", name: "Natura Wellness" },
+    category: copy.eyebrow,
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: copy.rating,
+      reviewCount: copy.reviewCount.replace(/[^0-9]/g, ""), // "2,316 reviews" -> "2316"
+    },
+    offers: {
+      "@type": "Offer",
+      price: (copy.oneTime.priceCents / 100).toFixed(2),
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+    },
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }
 
 /* ---------- Icons ---------- */
@@ -187,14 +239,14 @@ const Chevron = () => (
 
 const Check = () => (
   <svg className="bb-perks__icon" viewBox="0 0 16 16" aria-hidden="true">
-    <path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
 const CheckCircle = () => (
   <svg className="bb-trust__icon" viewBox="0 0 16 16" aria-hidden="true">
-    <circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M5.2 8.2l1.9 1.8 3.7-3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.7" />
+    <path d="M5.2 8.2l1.9 1.8 3.7-3.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 

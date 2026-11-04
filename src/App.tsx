@@ -39,6 +39,16 @@ const initialOpacity = Number(params.get("opacity") ?? 50);
 const initialDiff = params.get("diff") === "1";
 applyOverlay(document, initialOverlay, initialOpacity, initialDiff);
 
+// Each part gets its own title. The subscription page belongs to a signed-in customer, so search
+// engines are told not to index it; the product page keeps the defaults from index.html.
+if (part === "a") {
+  document.title = "Your subscription | Natura Wellness";
+  const robots = document.createElement("meta");
+  robots.name = "robots";
+  robots.content = "noindex, nofollow";
+  document.head.appendChild(robots);
+}
+
 export function App() {
   if (embedded) return part === "a" ? <SubscriptionCard /> : <BuyBox />;
   return <ReviewShell />;

@@ -4,7 +4,7 @@
   --sub-surface: #ffffff;
   --sub-ink: #1d2a23;
   --sub-body: #3f4b44;
-  --sub-muted: #66716a;
+  --sub-muted: #626d66; /* 4.5:1 or better on every background it sits on */
   --sub-line: #e7e1d6; /* card borders and dividers */
   --sub-line-strong: #d9d1c3;
   --sub-green: #17402f; /* forest: headings, buttons, selected border */
@@ -17,7 +17,7 @@
   --sub-grey-soft: #eeebe5;
   --sub-red: #9b2c2c;
   --sub-red-soft: #fbe9e7;
-  --sub-focus: #8fb89c;
+  --sub-focus: #17402f; /* focus rings need 3:1 against the page */
   --sub-radius-lg: 24px;
   --sub-radius: 16px;
   --sub-radius-sm: 12px;
@@ -273,6 +273,8 @@ body:has(.sub-shell) {
   animation: sub-in 0.25s ease-out;
 }
 .sub-notice p { margin: 0; flex: 1; }
+.sub-notice:focus { outline: none; }
+.sub-notice:focus-visible { outline: 2px solid var(--sub-focus); outline-offset: 2px; }
 .sub-notice--success { background: var(--sub-green-soft); color: var(--sub-green); }
 .sub-notice--info { background: var(--sub-gold-soft); color: var(--sub-gold-ink); }
 .sub-notice__close {

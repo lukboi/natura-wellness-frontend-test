@@ -48,8 +48,12 @@ export function CancelFlow({ sub, onClose, onApply, onSkipInstead, onCancelled }
 
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement as HTMLElement | null;
     if (dialog && !dialog.open) dialog.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
 
   // Move focus to each new step's heading so screen readers and keyboards follow along.
