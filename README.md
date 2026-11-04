@@ -35,7 +35,7 @@ Checked with axe-core (WCAG 2.2 AA + best practices) in every state of both part
 - **Focus never gets lost.** Sheets open on their question (so Enter can't confirm by accident) and hand focus back to the button that opened them. When an action removes that button (undo, cancel, resume, a successful skip), focus moves to the message saying what happened. Quantity buttons use `aria-disabled` at 1 and 10, so focus stays on them.
 - **Images.** The product photo has descriptive alt text; the small product tiles in Part A are decorative (`alt=""`), because the product name sits right next to them.
 - **SEO.** Part B: page title, meta description, Open Graph tags, one `h1`, and schema.org `Product` data (price, brand, rating) for rich results. Part A is a signed-in account page, so it's `noindex`.
-- **Bonus: reviews section.** "2,316 reviews" now scrolls to a reviews section below the buy box (outside the area matched to the reference). It has a rating summary whose breakdown adds up to 2,316 and averages 4.8, star bars that filter the list, and "Show more". The reviews are fictional samples in `src/part-b/reviewData.ts`.
+- **Bonus: reviews section.** "2,316 reviews" opens a reviews section below the buy box and moves to it; "Hide reviews" closes it and returns to the link. It starts closed so the page is exactly the reference screenshot: a taller page would add a scrollbar in the 1200px preview and shift the overlay. A link to `#reviews` opens it straight away. It has a rating summary whose breakdown adds up to 2,316 and averages 4.8, star bars that filter the list, and "Show more". The reviews are fictional samples in `src/part-b/reviewData.ts`.
 
 ## Review toolbar
 

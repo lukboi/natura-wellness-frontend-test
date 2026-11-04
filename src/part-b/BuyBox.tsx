@@ -19,6 +19,41 @@ export function BuyBox() {
   const [qty, setQty] = useState(1);
   // One polite message for screen readers after a quantity change, instead of two live regions.
   const [status, setStatus] = useState("");
+  // Reviews start closed so the page is exactly the reference screenshot (a taller page would add a
+  // scrollbar and shift the pixel overlay). A link to #reviews opens them straight away.
+  const [reviewsOpen, setReviewsOpen] = useState(() => window.location.hash === "#reviews");
+  // Where focus goes once the section has opened or closed (an effect runs after the DOM updates).
+  const reviewsFocus = useRef<"open" | "close" | null>(null);
+  const reviewsLinkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const target = reviewsFocus.current;
+    reviewsFocus.current = null;
+    if (target === "open") {
+      const heading = document.getElementById("reviews-title");
+      heading?.scrollIntoView({ block: "start" });
+      heading?.focus({ preventScroll: true });
+    } else if (target === "close") {
+      reviewsLinkRef.current?.focus();
+    }
+  }, [reviewsOpen]);
+  // A link to #reviews opens them, also when only the hash changes (no page reload).
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash === "#reviews") openReviews();
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  });
+  function openReviews() {
+    reviewsFocus.current = "open";
+    if (reviewsOpen) {
+      // Already open: the effect won't re-run, so move there directly.
+      const heading = document.getElementById("reviews-title");
+      heading?.scrollIntoView({ block: "start" });
+      heading?.focus({ preventScroll: true });
+      reviewsFocus.current = null;
+    } else setReviewsOpen(true);
+  }
   const groupName = useId();
   const freqId = useId();
 
@@ -64,7 +99,17 @@ export function BuyBox() {
             <span className="bb-rating__score" aria-hidden="true">
               {copy.rating}
             </span>
-            <a className="bb-rating__count" href="#reviews">
+            <a
+              ref={reviewsLinkRef}
+              className="bb-rating__count"
+              href="#reviews"
+              aria-expanded={reviewsOpen}
+              aria-controls="reviews"
+              onClick={(e) => {
+                e.preventDefault();
+                openReviews();
+              }}
+            >
               {copy.reviewCount}
             </a>
           </div>
@@ -188,7 +233,15 @@ export function BuyBox() {
           {plan === "subscribe" && <p className="bb-fine">{finePrint}</p>}
         </div>
       </div>
-      <Reviews />
+      {reviewsOpen && (
+        <Reviews
+          onClose={() => {
+            // Back to the link that opened them, at the top of the page.
+            reviewsFocus.current = "close";
+            setReviewsOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }

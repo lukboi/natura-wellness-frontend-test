@@ -336,6 +336,8 @@ html:has(.bb-page) { scroll-behavior: smooth; }
   letter-spacing: -0.01em;
   color: var(--bb-green);
 }
+.rv-title:focus { outline: none; }
+.rv-title:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 4px; border-radius: 4px; }
 .rv-score { display: flex; align-items: center; gap: 14px; margin-top: 20px; }
 .rv-score__value {
   font-family: Fraunces, Georgia, serif;
@@ -435,6 +437,22 @@ html:has(.bb-page) { scroll-behavior: smooth; }
   cursor: pointer;
 }
 .rv-more:hover { background: var(--bb-green-tint); }
+.rv-hide {
+  display: block;
+  margin: 16px auto 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--bb-muted);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rv-hide:hover { color: var(--bb-ink); }
+.rv-hide:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 2px; border-radius: 6px; }
 .rv-more:focus-visible { outline: 2px solid var(--bb-focus); outline-offset: 2px; }
 
 .rv-visually-hidden {

@@ -12,7 +12,7 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numer
 
 type Stars = 1 | 2 | 3 | 4 | 5;
 
-export function Reviews() {
+export function Reviews({ onClose }: { onClose: () => void }) {
   const [filter, setFilter] = useState<Stars | null>(null);
   const [shown, setShown] = useState(PAGE);
 
@@ -27,7 +27,7 @@ export function Reviews() {
   return (
     <section className="rv" id="reviews" aria-labelledby="reviews-title">
       <div className="rv-summary">
-        <h2 className="rv-title" id="reviews-title">
+        <h2 className="rv-title" id="reviews-title" tabIndex={-1}>
           Customer reviews
         </h2>
         <div className="rv-score">
@@ -100,6 +100,9 @@ export function Reviews() {
             Show more reviews
           </button>
         )}
+        <button type="button" className="rv-hide" onClick={onClose}>
+          Hide reviews
+        </button>
       </div>
     </section>
   );
